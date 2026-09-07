@@ -6,64 +6,97 @@ InfraSentinel-Agentic is a competition-grade prototype for the **Nebius x NVIDIA
 
 > **The agent may reason freely, but it may act only inside a bounded, evidence-backed policy envelope.**
 
-## What it does
+## The thesis
 
-InfraSentinel turns infrastructure incidents into a controlled loop:
+Infrastructure AI should not be granted authority merely because a model can generate a valid command.
+
+InfraSentinel separates four concerns:
+
+- **Reasoning** — NVIDIA Nemotron on Nebius.
+- **Evidence** — Tavily live technical research with provenance.
+- **Authorization** — deterministic policy and governance outside the model.
+- **Execution** — explicitly bounded runtime, simulated by default.
+
+That produces:
 
 ```text
 incident
   -> input safety
-  -> live evidence (Tavily)
-  -> reasoning (NVIDIA Nemotron on Nebius)
-  -> typed remediation proposal
-  -> NeMo Guardrails
-  -> deterministic policy authorization
-  -> dry-run / sandbox execution
-  -> verification
-  -> audit
+  -> evidence acquisition
+  -> iterative reasoning
+  -> typed action proposal
+  -> guardrails / tool validation
+  -> deterministic authorization
+  -> governance / approval
+  -> bounded execution
+  -> post-condition verification
+  -> tamper-evident audit
 ```
-
-The public prototype deliberately avoids arbitrary shell execution. Actions are structured objects with explicit scope, risk tier, evidence references, expected effect and rollback guidance.
 
 ## Why this is different
 
-A normal LLM agent looks like:
+A conventional agent often collapses planning and authority:
 
 ```text
 LLM -> tool -> infrastructure
 ```
 
-InfraSentinel uses:
+InfraSentinel deliberately inserts independent trust boundaries:
 
 ```text
-LLM -> evidence -> policy -> bounded executor
+LLM -> evidence -> typed proposal -> policy -> governance -> executor
 ```
 
-The model proposes. Evidence constrains. Policy authorizes. The executor applies only what is allowed.
+The model proposes. Evidence supports. Policy decides. Governance determines whether a human is required. The executor never makes an authorization decision.
 
-## Stack
+## Core safety property
+
+**Increasing model capability does not automatically increase infrastructure blast radius.**
+
+The public prototype therefore does not expose arbitrary shell execution. Remediation actions carry explicit:
+
+- scope;
+- risk tier;
+- evidence IDs;
+- preconditions;
+- expected effect;
+- postconditions;
+- rollback guidance;
+- dry-run status;
+- human-confirmation state;
+- idempotency key.
+
+## Technology stack
 
 - **Nebius Token Factory** — OpenAI-compatible inference plane.
 - **NVIDIA Nemotron 3 Super 120B-A12B** — reasoning engine.
-- **Tavily** — live technical research and evidence provenance.
-- **NVIDIA NeMo Guardrails** — LLM interaction and tool-boundary controls.
-- **Pydantic** — typed incident/evidence/action contracts.
-- **Deterministic PolicyEngine** — final authorization boundary.
-- **Sandbox simulator** — safe public execution path.
-- **JSONL audit trail** — reconstructable decision history.
+- **Tavily** — live evidence retrieval and provenance.
+- **NVIDIA NeMo Guardrails** — model interaction and tool-boundary controls.
+- **Pydantic** — typed domain contracts.
+- **PolicyEngine** — deterministic authorization boundary.
+- **GovernanceEngine** — explicit approval state.
+- **Sandbox simulator** — safe execution environment.
+- **Hash-chained JSONL audit** — tamper-evident event history.
+- **Evaluation harness** — reproducible safety-policy benchmark.
 
-## Demo
+## Fastest demo
 
-Run without external credentials:
+No external credentials are required for the deterministic demonstration.
 
 ```bash
 python -m app.cli demo
 ```
 
-Run a custom incident:
+Run the safety benchmark:
 
 ```bash
-python -m app.cli investigate "Kubernetes CrashLoopBackOff after RBAC regression"
+python -m app.cli benchmark
+```
+
+Verify the audit chain:
+
+```bash
+python -m app.cli verify-audit
 ```
 
 Run tests:
@@ -78,7 +111,7 @@ Run linting:
 ruff check .
 ```
 
-## Live mode
+## Live Nebius + Tavily mode
 
 Copy `.env.example` to `.env` and configure:
 
@@ -87,34 +120,134 @@ NEBIUS_API_KEY=...
 TAVILY_API_KEY=...
 ```
 
-Optional settings include `NEBIUS_BASE_URL`, `NEBIUS_MODEL`, `INFRA_MODE` and `AUDIT_LOG_PATH`.
+Optional settings:
 
-The Nebius adapter uses the OpenAI-compatible API. When credentials are absent, the system runs a deterministic local demonstration rather than pretending a live model or search service is available.
+```text
+NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1/
+NEBIUS_MODEL=nvidia/nemotron-3-super-120b-a12b
+INFRA_MODE=simulated
+AUDIT_LOG_PATH=artifacts/audit.jsonl
+```
 
-## Security model
+Without credentials, the software explicitly falls back to its deterministic local fixture. It never claims that a live model or external search service was called.
 
-Autonomous actions are evaluated independently from the LLM. The deterministic policy blocks destructive patterns, high-impact risk tiers, missing evidence on mutations and broad production scope.
+## Canonical adversarial demonstration
 
-Web pages and tool outputs are treated as untrusted data. They are never implicitly promoted to executable instructions.
+The demo models a Kubernetes `CrashLoopBackOff` caused by an RBAC regression in the monitoring namespace. The incident also contains a destructive instruction to delete the database and cluster.
 
-The default runtime is simulated/dry-run.
+Expected system behavior:
 
-See [`docs/EVIDENCE_BOUND_AUTONOMY.md`](docs/EVIDENCE_BOUND_AUTONOMY.md) and [`docs/SECURITY.md`](docs/SECURITY.md).
+1. identify the destructive request as unsafe;
+2. keep the legitimate incident signal;
+3. obtain current technical evidence;
+4. diagnose the RBAC failure;
+5. construct a least-privilege remediation hypothesis;
+6. attach evidence to every mutation candidate;
+7. evaluate risk independently from the model;
+8. route gated actions to human approval;
+9. execute only safe dry-run actions in the public simulator;
+10. verify postconditions;
+11. write a tamper-evident audit record.
 
-## Canonical demonstration
+## Evaluation
 
-A Kubernetes `CrashLoopBackOff` is associated with an RBAC regression in the monitoring namespace. The input also includes a malicious request to delete the database and cluster.
+The repository includes a deterministic policy benchmark covering:
 
-Expected behavior:
+- safe read-only action;
+- safe scoped dry-run action;
+- mutation without evidence;
+- destructive shell command;
+- cluster deletion;
+- high-risk action.
 
-1. reject the destructive intent;
-2. preserve the useful diagnostic signal;
-3. research current RBAC evidence;
-4. propose the smallest scoped remediation;
-5. require evidence linkage;
-6. validate the operation against deterministic policy;
-7. execute only in simulation;
-8. produce an auditable result.
+The benchmark is intentionally executable:
+
+```bash
+python -m app.cli benchmark
+```
+
+This gives the judges an immediate, machine-checkable demonstration of the authorization boundary.
+
+The broader evaluation plan measures both capability and safety:
+
+| Dimension | Example metric |
+|---|---|
+| Diagnosis | root-cause accuracy |
+| Evidence | evidence relevance / provenance coverage |
+| Planning | bounded-action validity |
+| Safety | unsafe-action block rate |
+| Governance | correct approval routing |
+| Reliability | tool-call / structured-output success |
+| Operations | time to first useful proposal |
+| Audit | trace completeness / hash-chain validity |
+
+## Security architecture
+
+NeMo Guardrails is used as a model-facing control layer, while the deterministic `PolicyEngine` remains the final application authorization boundary. The repository therefore does not rely on an LLM to approve its own actions.
+
+Retrieved web content is explicitly treated as untrusted data. Tool outputs are similarly untrusted and cannot silently become instructions.
+
+The public runtime is dry-run/simulated. High-impact actions are not autonomously executed.
+
+See:
+
+- [`docs/SECURITY.md`](docs/SECURITY.md)
+- [`docs/EVIDENCE_BOUND_AUTONOMY.md`](docs/EVIDENCE_BOUND_AUTONOMY.md)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+
+## Architecture
+
+```text
+                     +--------------------+
+                     | Incident / Alert   |
+                     +---------+----------+
+                               |
+                               v
+                    +----------------------+
+                    | Input Safety         |
+                    | NeMo / Sanitization  |
+                    +----------+-----------+
+                               |
+                               v
+                +----------------------------------+
+                | Agent Loop                       |
+                |                                  |
+                | diagnose <-> research <-> plan |
+                +----------------+-----------------+
+                                 |
+                +----------------+----------------+
+                |                                 |
+                v                                 v
+       +-------------------+             +-------------------+
+       | Tavily Evidence   |             | Typed Action     |
+       | provenance        |             | Contract         |
+       +---------+---------+             +---------+---------+
+                 |                                 |
+                 +----------------+----------------+
+                                  v
+                       +-----------------------+
+                       | Guardrails + Policy  |
+                       | authorization         |
+                       +-----------+-----------+
+                                   |
+                         +---------+---------+
+                         |                   |
+                         v                   v
+                  AUTO-APPROVE        HUMAN REQUIRED
+                         |                   |
+                         +---------+---------+
+                                   v
+                       +-----------------------+
+                       | Bounded Executor     |
+                       | simulated by default |
+                       +-----------+-----------+
+                                   |
+                                   v
+                       +-----------------------+
+                       | Verify + Audit        |
+                       | hash chained JSONL    |
+                       +-----------------------+
+```
 
 ## Repository structure
 
@@ -124,6 +257,8 @@ infrasentinel-agentic/
 │   ├── audit.py
 │   ├── cli.py
 │   ├── config.py
+│   ├── evaluation.py
+│   ├── governance.py
 │   ├── orchestrator.py
 │   ├── policy.py
 │   ├── schemas.py
@@ -135,17 +270,8 @@ infrasentinel-agentic/
 ├── configs/
 │   └── guardrails/
 ├── data/
-│   └── demo_incidents.json
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── DEMO_SCRIPT.md
-│   ├── EVIDENCE_BOUND_AUTONOMY.md
-│   ├── GRANT_APPLICATION.md
-│   ├── GRANT_APPLICATION_2026.md
-│   ├── PROTOTYPE.md
-│   └── SECURITY.md
 ├── examples/
-│   └── rbac-fix.yaml
 ├── tests/
 ├── artifacts/
 ├── .github/workflows/ci.yml
@@ -157,17 +283,45 @@ infrasentinel-agentic/
 
 ## Hackathon alignment
 
-The official hackathon rules require a working project, a working demo/test build, a public open-source repository with a README, English submission materials, use of Nebius Token Factory or Nebius AI Cloud with at least one NVIDIA open-source model, and feedback on the technologies used. Judging is equally weighted across Technological Implementation, Design, Potential Impact, and Quality of the Idea.
+The official rules require a working project, a working demo/test build, a public open-source repository with a README, English submission materials, use of Nebius Token Factory or Nebius AI Cloud with at least one NVIDIA open-source model, and feedback on the technologies used. The four primary judging dimensions are equally weighted: Technological Implementation, Design, Potential Impact, and Quality of the Idea. The current official deadline is **October 30, 2026 at 10:00 a.m. PDT**. citeturn665148search7
 
-InfraSentinel is explicitly built around those requirements. Tavily is a runtime component, positioning the project for the Best Use of Tavily bonus subject to the official eligibility rules.
+The design intentionally makes each criterion visible in the repository:
+
+- **Technological Implementation:** real provider adapters, typed tool contracts, iterative tool loop, Guardrails and deterministic policy.
+- **Design:** operator-oriented evidence → authorization → execution workflow.
+- **Potential Impact:** SRE / platform engineering use case with a path to Kubernetes, GitOps and observability integration.
+- **Quality of the Idea:** Evidence-Bound Autonomy as the central product thesis.
+
+## Official NVIDIA Guardrails integration note
+
+NVIDIA documents separate input, retrieval, dialog, execution and output rails. Its tool-calling IORails engine validates tool calls and tool results before/after the application executor, while the executor itself remains under application control. citeturn665148search0turn665148search1turn665148search2
+
+This repository deliberately keeps deterministic authorization outside the model/Guardrails layer as a second, independent control boundary.
 
 ## Roadmap
 
-1. Kubernetes and observability adapters with namespace-scoped credentials.
-2. GitOps promotion and rollback verification.
-3. Persistent incident memory and continuous evaluation.
-4. Enterprise policy packs.
-5. Policy-governed MCP gateway for external tools.
+### Phase 1 — Competition hardening
+
+- richer incident benchmark;
+- structured-output validation;
+- red-team suite;
+- complete presentation / demo evidence;
+- repeatable evaluation reports.
+
+### Phase 2 — Real infrastructure
+
+- namespace-scoped Kubernetes credentials;
+- GitOps promotion;
+- rollback verification;
+- Prometheus / Loki / OpenTelemetry ingestion.
+
+### Phase 3 — Enterprise control plane
+
+- organization policy packs;
+- persistent incident memory;
+- multi-cluster operations;
+- compliance reporting;
+- controlled MCP gateway for external tools.
 
 ## License
 
