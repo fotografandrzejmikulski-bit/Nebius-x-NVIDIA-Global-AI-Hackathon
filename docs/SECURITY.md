@@ -1,41 +1,91 @@
-# Security model
+# Security Model
+
+## Security thesis
+
+InfraSentinel assumes that incident descriptions, logs, retrieved web pages, tool results and model-generated text may contain misleading or adversarial instructions.
+
+> **External content is data, never authority.**
 
 ## Threat model
 
-InfraSentinel assumes that incident descriptions, logs, retrieved web pages, tool results and model-generated text can all contain misleading or adversarial instructions.
+The prototype explicitly considers:
 
-The system therefore treats external content as **data, not authority**.
+- prompt injection inside incident text or logs;
+- malicious instructions inside retrieved web pages;
+- unsafe or malformed model tool calls;
+- destructive action proposals;
+- privilege escalation through broad target scope;
+- missing or weak evidence provenance;
+- accidental execution outside dry-run mode;
+- tampering with the local audit trail;
+- provider outages and partial failures.
 
-## Controls
+## Defense in depth
 
 ### Input
 
-NeMo Guardrails can apply jailbreak heuristics and input policy checks before model processing. NVIDIA documents these as input rails and also documents PII masking and related built-in controls.
+The guardrails layer can inspect and constrain user/incident input before model processing. NVIDIA documents input rails as an explicit stage in the request pipeline. citeturn665148search1turn665148search2
 
 ### Retrieval
 
-Tavily searches are constrained to selected authoritative domains for the demo. The evidence object stores provenance so a recommendation can be inspected instead of accepted as an anonymous model fact.
+Tavily results are stored as explicit evidence objects with source URLs, excerpts, relevance and retrieval metadata. Retrieval content remains untrusted data.
+
+### Tool boundary
+
+NVIDIA's IORails tool-calling capability validates tool names and JSON-schema arguments and validates the linkage and structure of tool results. It fails closed on malformed tool traffic. The application still owns actual tool execution. citeturn665148search0
 
 ### Planning
 
-The model is instructed to diagnose before action, use evidence, prefer minimal reversible changes, and never treat retrieved text as executable instruction.
+The model is instructed to diagnose before acting, use evidence, prefer minimal reversible changes, and never follow instructions embedded in retrieved content.
 
 ### Authorization
 
-`PolicyEngine` is deterministic and independent of the model. It rejects known destructive command patterns, high/critical autonomous risk, unsupported broad production scope, and non-read actions without evidence.
+`PolicyEngine` operates independently of the model. It rejects known destructive operations, excessive risk, missing evidence for mutations and broad production scope.
+
+### Governance
+
+`GovernanceEngine` distinguishes between `auto_approved`, `human_required` and `denied`. This prevents policy permission from being confused with execution permission.
 
 ### Execution
 
-The public prototype uses a simulator and keeps all actions in dry-run mode. No real cluster, database or cloud account is modified.
+The public runtime is a simulator. It accepts dry-run operations only and never modifies a real cluster or database.
+
+### Verification
+
+Execution and verification are separate states. A successful tool invocation is not treated as proof that the desired infrastructure postcondition occurred.
 
 ### Audit
 
-Each incident, evidence collection phase, policy decision and action result is written to an append-only JSONL audit file with unique event IDs and UTC timestamps.
+The audit stream is JSONL but now includes a SHA-256 hash chain linking each event to its predecessor. The verifier can detect modification or deletion/reordering of historical events.
 
-## Security boundary statement
+This is **tamper-evident**, not an absolute guarantee of immutability: an attacker with write access to the complete audit store could rewrite the entire file and its chain. Production deployment should therefore replicate or anchor audit state in a controlled external system.
 
-NeMo Guardrails is a programmable LLM safety layer, not a complete infrastructure authorization system. The strongest architectural choice in this prototype is therefore defense in depth: LLM guardrails + typed action schemas + deterministic policy + least-privilege execution adapters + auditability.
+## Fail-closed behavior
+
+The system should fail closed when:
+
+- tool arguments cannot be parsed;
+- a tool result cannot be structurally linked to its call;
+- required evidence is missing;
+- a policy check fails;
+- risk exceeds the autonomous ceiling;
+- a high-impact operation lacks human approval;
+- the runtime is not operating in an allowed mode;
+- verification cannot establish required postconditions.
 
 ## Production hardening
 
-Before connecting a real cluster, the runtime adapter must add workload identity, short-lived credentials, namespace/resource allowlists, server-side authorization, admission controls, approval workflows for high-risk changes, network egress policy, secret redaction, and rollback verification.
+Before real infrastructure connectivity, add:
+
+- workload identity and short-lived credentials;
+- namespace/resource allowlists;
+- server-side RBAC / IAM authorization;
+- Kubernetes admission control;
+- GitOps-only promotion for persistent changes;
+- dual-control approval for high-impact operations;
+- network egress restrictions;
+- secrets and PII redaction;
+- signed or externally anchored audit records;
+- rollback verification;
+- rate limits, action budgets and circuit breakers;
+- independent monitoring of the agent itself.
