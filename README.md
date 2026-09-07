@@ -1,195 +1,174 @@
 # InfraSentinel-Agentic
 
-**Evidence-first autonomous SRE for safe incident diagnosis and bounded remediation.**
+**Evidence-first autonomous SRE for safe, bounded remediation.**
 
-InfraSentinel-Agentic is a competition-grade prototype for the **Nebius x NVIDIA Global AI Hackathon 2026**. It uses NVIDIA Nemotron served through Nebius Token Factory, Tavily for live technical research, and NVIDIA NeMo Guardrails as a policy enforcement layer around tool use.
-
-The core design principle is simple:
+InfraSentinel-Agentic is a competition-grade prototype for the **Nebius x NVIDIA Global AI Hackathon 2026**, targeting the **Coding and Agentic Engineering** track and the **Best Use of Tavily** bonus.
 
 > **The agent may reason freely, but it may act only inside a bounded, evidence-backed policy envelope.**
 
-## Why this project exists
+## What it does
 
-Traditional automation can execute known playbooks, while generic LLM agents can produce plausible but unsafe commands. InfraSentinel combines model reasoning with live evidence, typed incident state, deterministic risk classification, a dry-run/apply boundary, and immutable audit events.
-
-## Hackathon alignment
-
-- **Primary track:** Coding and Agentic Engineering
-- **Required platform:** Nebius Token Factory
-- **NVIDIA model:** `nvidia/nemotron-3-super-120b-a12b`
-- **Tavily:** runtime search for current infrastructure documentation
-- **NVIDIA NeMo Guardrails:** input and output safety plus tool-call policy checks
-- **Demo mode:** deterministic local simulation; no real infrastructure is touched by default
-
-The hackathon requires a working software application on Nebius Token Factory or Nebius AI Cloud, use of at least one NVIDIA open-source model, a public open-source repository, a README with run instructions, a working demo/test build, and a public demonstration video shorter than three minutes. See the official rules: https://nebiusglobalaihackathon.devpost.com/rules
-
-## Architecture
+InfraSentinel turns infrastructure incidents into a controlled loop:
 
 ```text
-                         +----------------------+
-                         | Incident / Operator  |
-                         +----------+-----------+
-                                    |
-                                    v
-                       +--------------------------+
-                       | Input Policy + Sanitizer |
-                       | NeMo Guardrails          |
-                       +------------+-------------+
-                                    |
-                                    v
-                 +-------------------------------------------+
-                 | Agent Orchestrator                         |
-                 |                                           |
-                 | 1. classify incident                     |
-                 | 2. research current evidence             |
-                 | 3. synthesize diagnosis                   |
-                 | 4. create bounded remediation plan       |
-                 | 5. score risk / require evidence          |
-                 +-------------------+-----------------------+
-                                     |
-                      +--------------+--------------+
-                      |                             |
-                      v                             v
-             +----------------+           +---------------------+
-             | Tavily Search  |           | Policy Engine       |
-             | live evidence  |           | allow / deny / ask  |
-             +--------+-------+           +----------+----------+
-                      |                              |
-                      +---------------+--------------+
-                                      |
-                                      v
-                             +------------------+
-                             | Sandbox Executor |
-                             | dry-run default  |
-                             +--------+---------+
-                                      |
-                                      v
-                             +------------------+
-                             | Audit Trail      |
-                             | JSONL events     |
-                             +------------------+
+incident
+  -> input safety
+  -> live evidence (Tavily)
+  -> reasoning (NVIDIA Nemotron on Nebius)
+  -> typed remediation proposal
+  -> NeMo Guardrails
+  -> deterministic policy authorization
+  -> dry-run / sandbox execution
+  -> verification
+  -> audit
 ```
 
-## Safety model
+The public prototype deliberately avoids arbitrary shell execution. Actions are structured objects with explicit scope, risk tier, evidence references, expected effect and rollback guidance.
 
-The prototype deliberately does **not** expose arbitrary shell execution. Remediation is represented as structured actions with:
+## Why this is different
 
-- explicit action IDs,
-- target scope,
-- risk tier,
-- evidence references,
-- expected effect,
-- rollback guidance,
-- dry-run support,
-- deterministic allow/deny policy.
+A normal LLM agent looks like:
 
-High-impact operations are denied in the demo policy. The architecture is designed so a future production adapter can connect to Kubernetes, cloud APIs, CI/CD or ticketing systems without removing the policy boundary.
-
-## Live Tavily research
-
-The Tavily adapter uses advanced search with raw content and domain constraints. Current Tavily documentation confirms `advanced`, `include_raw_content`, `include_domains`, and `chunks_per_source` as supported controls for search. The implementation intentionally keeps source URLs and excerpts in the evidence model so the final report can cite where a recommendation came from.
-
-## Running locally
-
-### 1. Environment
-
-```bash
-cp .env.example .env
-# set NEBIUS_API_KEY and TAVILY_API_KEY
+```text
+LLM -> tool -> infrastructure
 ```
 
-### 2. Install
+InfraSentinel uses:
 
-Python 3.11+ is recommended.
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+```text
+LLM -> evidence -> policy -> bounded executor
 ```
 
-### 3. Demo
+The model proposes. Evidence constrains. Policy authorizes. The executor applies only what is allowed.
 
-The demo runs without touching real infrastructure:
+## Stack
+
+- **Nebius Token Factory** — OpenAI-compatible inference plane.
+- **NVIDIA Nemotron 3 Super 120B-A12B** — reasoning engine.
+- **Tavily** — live technical research and evidence provenance.
+- **NVIDIA NeMo Guardrails** — LLM interaction and tool-boundary controls.
+- **Pydantic** — typed incident/evidence/action contracts.
+- **Deterministic PolicyEngine** — final authorization boundary.
+- **Sandbox simulator** — safe public execution path.
+- **JSONL audit trail** — reconstructable decision history.
+
+## Demo
+
+Run without external credentials:
 
 ```bash
 python -m app.cli demo
 ```
 
-You can also run a custom incident:
+Run a custom incident:
 
 ```bash
-python -m app.cli investigate "Kubernetes CrashLoopBackOff after RBAC change"
+python -m app.cli investigate "Kubernetes CrashLoopBackOff after RBAC regression"
 ```
 
-With `TAVILY_API_KEY` and `NEBIUS_API_KEY` configured, the live path calls the real services. Without credentials, the deterministic demo fixture keeps the software runnable for judges and local review.
-
-## Test suite
+Run tests:
 
 ```bash
 pytest -q
 ```
 
-The tests cover policy decisions, destructive-action denial, evidence requirements, demo execution, and serialization.
+Run linting:
 
-## Configuration
+```bash
+ruff check .
+```
 
-Environment variables:
+## Live mode
 
-- `NEBIUS_API_KEY` — Nebius Token Factory API key
-- `NEBIUS_BASE_URL` — optional override for the Nebius OpenAI-compatible endpoint
-- `NEBIUS_MODEL` — defaults to NVIDIA Nemotron 3 Super
-- `TAVILY_API_KEY` — Tavily API key
-- `INFRA_MODE` — `simulated` by default
-- `AUDIT_LOG_PATH` — JSONL audit path, defaults to `artifacts/audit.jsonl`
-
-## Repository layout
+Copy `.env.example` to `.env` and configure:
 
 ```text
-infraSentinel-agentic/
+NEBIUS_API_KEY=...
+TAVILY_API_KEY=...
+```
+
+Optional settings include `NEBIUS_BASE_URL`, `NEBIUS_MODEL`, `INFRA_MODE` and `AUDIT_LOG_PATH`.
+
+The Nebius adapter uses the OpenAI-compatible API. When credentials are absent, the system runs a deterministic local demonstration rather than pretending a live model or search service is available.
+
+## Security model
+
+Autonomous actions are evaluated independently from the LLM. The deterministic policy blocks destructive patterns, high-impact risk tiers, missing evidence on mutations and broad production scope.
+
+Web pages and tool outputs are treated as untrusted data. They are never implicitly promoted to executable instructions.
+
+The default runtime is simulated/dry-run.
+
+See [`docs/EVIDENCE_BOUND_AUTONOMY.md`](docs/EVIDENCE_BOUND_AUTONOMY.md) and [`docs/SECURITY.md`](docs/SECURITY.md).
+
+## Canonical demonstration
+
+A Kubernetes `CrashLoopBackOff` is associated with an RBAC regression in the monitoring namespace. The input also includes a malicious request to delete the database and cluster.
+
+Expected behavior:
+
+1. reject the destructive intent;
+2. preserve the useful diagnostic signal;
+3. research current RBAC evidence;
+4. propose the smallest scoped remediation;
+5. require evidence linkage;
+6. validate the operation against deterministic policy;
+7. execute only in simulation;
+8. produce an auditable result.
+
+## Repository structure
+
+```text
+infrasentinel-agentic/
 ├── app/
-│   ├── __init__.py
+│   ├── audit.py
 │   ├── cli.py
 │   ├── config.py
-│   ├── schemas.py
 │   ├── orchestrator.py
 │   ├── policy.py
-│   ├── audit.py
+│   ├── schemas.py
 │   ├── providers/
-│   │   ├── __init__.py
 │   │   ├── nebius.py
 │   │   └── tavily.py
 │   └── runtime/
-│       ├── __init__.py
 │       └── simulator.py
 ├── configs/
 │   └── guardrails/
 ├── data/
 │   └── demo_incidents.json
-├── tests/
 ├── docs/
 │   ├── ARCHITECTURE.md
-│   ├── SECURITY.md
-│   └── GRANT_APPLICATION.md
+│   ├── DEMO_SCRIPT.md
+│   ├── EVIDENCE_BOUND_AUTONOMY.md
+│   ├── GRANT_APPLICATION.md
+│   ├── GRANT_APPLICATION_2026.md
+│   ├── PROTOTYPE.md
+│   └── SECURITY.md
+├── examples/
+│   └── rbac-fix.yaml
+├── tests/
 ├── artifacts/
-│   └── .gitkeep
+├── .github/workflows/ci.yml
 ├── .env.example
-├── .gitignore
-├── LICENSE
 ├── pyproject.toml
 ├── requirements.txt
-└── README.md
+└── LICENSE
 ```
 
-## Roadmap beyond the hackathon
+## Hackathon alignment
 
-1. Kubernetes adapter with namespace-scoped service accounts.
-2. GitOps change proposals and automatic rollback verification.
-3. Prometheus/Loki/OpenTelemetry adapters.
-4. Policy packs for different regulated environments.
-5. Continuous evaluation against an incident benchmark.
-6. Optional MCP gateway so the same policy engine protects external tool servers.
+The official hackathon rules require a working project, a working demo/test build, a public open-source repository with a README, English submission materials, use of Nebius Token Factory or Nebius AI Cloud with at least one NVIDIA open-source model, and feedback on the technologies used. Judging is equally weighted across Technological Implementation, Design, Potential Impact, and Quality of the Idea.
+
+InfraSentinel is explicitly built around those requirements. Tavily is a runtime component, positioning the project for the Best Use of Tavily bonus subject to the official eligibility rules.
+
+## Roadmap
+
+1. Kubernetes and observability adapters with namespace-scoped credentials.
+2. GitOps promotion and rollback verification.
+3. Persistent incident memory and continuous evaluation.
+4. Enterprise policy packs.
+5. Policy-governed MCP gateway for external tools.
 
 ## License
 
-Apache License 2.0. See `LICENSE`.
+Apache License 2.0.
