@@ -18,5 +18,7 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
+      - run: ruff check .
       - run: pytest -q
-      - run: python -m compileall app
+      - run: python -m compileall -q app
+      - run: python -m app.cli benchmark
