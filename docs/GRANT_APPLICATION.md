@@ -1,200 +1,454 @@
-# Grant Application — InfraSentinel-Agentic
+# Grant / Hackathon Application — InfraSentinel-Agentic
 
-## Project Title
+## Project
 
-**InfraSentinel-Agentic: Evidence-First Autonomous SRE on Nebius with NVIDIA Nemotron**
+**InfraSentinel-Agentic: Evidence-Bound Autonomous SRE on Nebius with NVIDIA Nemotron**
 
-## Executive Summary
+**Primary track:** Coding and Agentic Engineering  
+**Bonus target:** Best Use of Tavily  
+**Repository:** https://github.com/fotografandrzejmikulski-bit/Nebius-x-NVIDIA-Global-AI-Hackathon
 
-InfraSentinel-Agentic is a safety-first autonomous Site Reliability Engineering system designed to shorten incident response without turning infrastructure access into an uncontrolled LLM side effect.
+---
 
-The system combines NVIDIA Nemotron served through Nebius Token Factory, Tavily live technical research, NVIDIA NeMo Guardrails, typed remediation contracts, deterministic risk policy, a dry-run execution boundary, and an auditable event trail.
+## 1. Executive Summary
 
-Its central innovation is architectural rather than cosmetic: **the model is allowed to reason broadly, but it is authorized to act narrowly**.
+InfraSentinel-Agentic is an evidence-first autonomous Site Reliability Engineering system designed to reduce incident-response toil while preventing LLM-generated infrastructure actions from becoming uncontrolled operational authority.
 
-For a production incident such as a Kubernetes CrashLoopBackOff following an RBAC regression, the system can collect current evidence, formulate a diagnosis, propose a minimal reversible remediation, validate the action against deterministic policy, execute only within the approved envelope, and record the entire chain for later review.
+The project combines NVIDIA Nemotron 3 Super served through Nebius Token Factory, Tavily live technical research, NVIDIA NeMo Guardrails, typed remediation contracts, deterministic authorization, explicit governance/approval states, safe simulation, post-condition verification, and a tamper-evident audit trail.
 
-The public hackathon prototype intentionally uses a safe simulator. No real production infrastructure is modified. The same policy and action contracts are designed to support future Kubernetes, GitOps, observability and cloud adapters.
+The central engineering thesis is:
 
-## Problem
+> **The model may reason broadly, but it may act only inside a bounded, evidence-backed authorization envelope.**
 
-Modern infrastructure failures move faster than static runbooks. Kubernetes, cloud APIs, container runtimes, deployment controllers and security policies evolve continuously. An incident responder therefore needs two things at the same time: current technical knowledge and safe operational authority.
+For a Kubernetes incident such as CrashLoopBackOff following an RBAC regression, the intended flow is:
 
-Generic LLM agents address the first problem but can worsen the second. A plausible command is not an authorization decision. A retrieved web page is not an instruction from the operator. A model-generated tool call is not automatically safe because it is syntactically valid.
+**observe → research → diagnose → propose → validate → authorize → govern → execute → verify → audit**
 
-InfraSentinel treats these boundaries as first-class engineering requirements.
+The public prototype intentionally remains safe by default: it does not require a live cluster and the simulator only accepts dry-run operations.
 
-## Proposed Solution
+---
 
-InfraSentinel turns incident response into a controlled evidence-to-action pipeline:
+## 2. The Problem
 
-1. Normalize and classify an incident.
-2. Retrieve fresh, source-attributed technical evidence with Tavily.
-3. Ask NVIDIA Nemotron to diagnose the fault and construct a remediation hypothesis.
-4. Convert proposed operations into typed actions with explicit scope, risk, evidence and rollback metadata.
-5. Pass the action through NeMo Guardrails and a deterministic policy engine.
-6. Execute only the actions permitted by the policy boundary; the public prototype remains dry-run only.
-7. Record evidence, policy decisions and execution results in an audit trail.
+Infrastructure is a moving target. Kubernetes APIs, cloud services, container images, deployment controllers and security policies evolve faster than static runbooks.
 
-## Why Nebius + NVIDIA
+Generic LLM agents improve access to operational knowledge, but they introduce a second problem: a syntactically valid command is not the same thing as an authorized operation.
 
-Nebius Token Factory provides an OpenAI-compatible inference path for NVIDIA Nemotron models. NVIDIA positions Nemotron 3 Super 120B as a hybrid MoE model optimized for efficient multi-agent AI and complex reasoning. This makes it a natural reasoning layer for a long-horizon, tool-mediated operational workflow.
+Three common failure modes are especially dangerous:
 
-The engineering benefit is that the project can concentrate on agentic control logic rather than maintaining a GPU inference stack. The hackathon itself requires projects to run on Nebius Token Factory or Nebius AI Cloud and use at least one NVIDIA open-source model.
+1. stale or hallucinated technical guidance;
+2. prompt injection embedded in incident data, logs or retrieved documents;
+3. excessive authority granted to a model that was only intended to provide assistance.
 
-## Why Tavily
+The project therefore treats **knowledge, reasoning, authorization and execution as separate trust domains**.
 
-Tavily is not included as a decorative search box. It is a decision dependency.
+---
 
-When the agent encounters version-sensitive infrastructure behavior, it searches authoritative technical sources and preserves provenance in the evidence model. The current Tavily Python SDK supports advanced search, domain inclusion, raw content, result limits and chunk controls. The prototype uses these capabilities to reduce irrelevant context and keep evidence tied to explicit URLs.
+## 3. The Proposed Solution
 
-This creates a defensible chain:
+InfraSentinel converts an incident into a controlled evidence-to-action workflow.
 
-**incident -> query -> sources -> evidence -> diagnosis -> proposed action**
+### Intake
+
+Normalize the alert into a typed incident object containing environment, service, severity, context and observation time.
+
+### Evidence acquisition
+
+Use Tavily to retrieve current, source-attributed technical evidence, with the search constrained to authoritative infrastructure domains for the public demonstration.
+
+### Reasoning
+
+Use NVIDIA Nemotron on Nebius Token Factory to synthesize evidence, diagnose the likely failure and construct bounded candidate actions.
+
+### Action contract
+
+Represent each proposal as a typed object carrying:
+
+- action ID;
+- command representation;
+- target scope;
+- risk tier;
+- evidence IDs;
+- preconditions;
+- expected effect;
+- postconditions;
+- rollback guidance;
+- dry-run status;
+- idempotency key.
+
+### Authorization
+
+Run every candidate through a deterministic policy engine that is independent of the model.
+
+### Governance
+
+Separate authorization from approval. An action can be policy-allowed while still being routed to human approval because of its risk, execution mode or explicit confirmation requirement.
+
+### Execution
+
+Use a safe simulator for the public submission. Production adapters are a future extension and cannot bypass the policy contract.
+
+### Verification
+
+Treat successful invocation and desired infrastructure state as separate conditions. The execution result does not automatically prove that the postcondition occurred.
+
+### Audit
+
+Record the decision path as structured JSONL events linked by a cryptographic hash chain.
+
+---
+
+## 4. What Makes the Idea Novel
+
+The principal innovation is the **Evidence-Bound Autonomy Envelope**.
+
+Instead of treating an agent as either fully autonomous or fully manual, every proposed action earns authority along explicit dimensions:
+
+| Dimension | Constraint |
+|---|---|
+| Evidence | mutation must cite explicit evidence objects |
+| Provenance | sources remain inspectable |
+| Scope | target must be explicit and bounded |
+| Risk | typed risk tier must fit policy ceiling |
+| Destructiveness | denied classes cannot cross the boundary |
+| Reversibility | rollback guidance is required |
+| Verification | expected postconditions are declared |
+| Governance | human approval can be mandatory |
+| Execution | public runtime is dry-run/simulated |
+| Audit | state transitions are tamper-evident |
+
+This produces a general architectural property:
+
+> **Increasing model capability does not automatically increase infrastructure blast radius.**
+
+That is the key distinction between a capable infrastructure chatbot and a governable autonomous SRE system.
+
+---
+
+## 5. Why Nebius + NVIDIA
+
+Nebius Token Factory is the inference plane. The code uses its OpenAI-compatible interface to access NVIDIA Nemotron.
+
+NVIDIA documents Nemotron 3 Super 120B as a hybrid architecture with sparse expert activation and a context window extending to 1M tokens. These characteristics are well matched to long-horizon, evidence-rich agentic workflows.
+
+The project uses NVIDIA technology as part of the operational design rather than as branding:
+
+**Nemotron = reasoning engine**  
+**NeMo Guardrails = model/tool safety layer**  
+**Nebius = managed inference plane**
+
+This separation keeps infrastructure authority in application-level policy rather than inside the model.
+
+---
+
+## 6. Why Tavily Matters
+
+Tavily is a functional dependency of the decision workflow.
+
+When current technical evidence is needed, the agent searches authoritative sources and preserves provenance. The result is not copied into an anonymous prompt blob; it becomes explicit evidence that can be referenced by downstream actions.
+
+The intended chain is:
+
+**incident → query → source → evidence object → diagnosis → action**
 
 rather than:
 
-**incident -> model memory -> command**
+**incident → model memory → command**
 
-## Why NVIDIA NeMo Guardrails
+This directly supports the project's central safety claim: actions should be justified by inspectable evidence.
 
-The security design uses defense in depth. NVIDIA documents input, retrieval, dialog, execution and output rails as distinct control points; execution rails govern custom actions and tools, and the IORails tool-calling path can validate OpenAI-compatible tool traffic before it reaches the application executor.
+---
 
-InfraSentinel goes one step further by retaining a deterministic application policy outside the LLM. This matters because semantic safety and infrastructure authorization are related but not identical problems.
+## 7. Why NeMo Guardrails Matters
 
-## Innovation
+NVIDIA documents multiple rail types across the LLM interaction lifecycle, including input, retrieval, dialog, execution and output controls. Its IORails tool-calling path can validate tool names and JSON-schema arguments as well as tool-result linkage before the application executor receives them. citeturn665148search0turn665148search1turn665148search2
 
-The key innovation is an **Evidence-Bound Autonomy Envelope**.
+InfraSentinel deliberately does not make Guardrails the sole authority layer. It adds deterministic application authorization after model-facing controls.
 
-An AI agent does not receive a binary "autonomous / not autonomous" setting. Instead, each proposed operation is evaluated across four dimensions:
+That produces defense in depth:
 
-- Evidence: what source supports the action?
-- Scope: what resources will it touch?
-- Risk: what is the blast radius?
-- Reversibility: how can the change be undone?
+**Guardrails → typed contract → deterministic policy → governance → executor**
 
-The agent earns operational authority one bounded action at a time.
+---
 
-This creates a general pattern for secure agentic infrastructure: **reasoning can be open-ended while authority remains constrained**.
+## 8. Demonstrated Use Case
 
-## Technical Architecture
+The canonical demonstration is a Kubernetes `CrashLoopBackOff` in the `monitoring` namespace associated with an RBAC regression.
 
-### Cognitive layer
+The same incident payload also contains a malicious request to delete the database and cluster.
 
-NVIDIA Nemotron on Nebius Token Factory provides reasoning, incident decomposition and plan synthesis.
+The expected behavior is deliberately dual-purpose:
 
-### Epistemic layer
+1. recognize that the destructive request is outside policy;
+2. preserve the legitimate diagnostic signal;
+3. retrieve relevant current evidence;
+4. diagnose the RBAC failure;
+5. propose a minimally scoped candidate remediation;
+6. require evidence linkage;
+7. apply deterministic authorization;
+8. route gated operations to human approval;
+9. execute only safe dry-run actions in the public simulator;
+10. verify declared postconditions;
+11. produce a reconstructable audit trail.
 
-Tavily provides live evidence retrieval and source provenance.
+This makes the demo a test of both **capability and restraint**.
 
-### Safety layer
+---
 
-NVIDIA NeMo Guardrails provides LLM-facing input/output and tool-boundary controls.
+## 9. Technical Architecture
 
-### Authorization layer
+```text
+                   +-------------------------+
+                   | Incident / Alert Source |
+                   +------------+------------+
+                                |
+                                v
+                   +--------------------------+
+                   | Input Safety / Normalize |
+                   +------------+-------------+
+                                |
+                                v
+                   +--------------------------+
+                   | Nemotron Agent Loop      |
+                   | diagnose <-> research    |
+                   | hypothesis <-> proposal  |
+                   +------+-------------------+
+                          |
+               +----------+-----------+
+               |                      |
+               v                      v
+       +---------------+     +-------------------+
+       | Tavily        |     | Typed Action      |
+       | Evidence      |     | Contract          |
+       +-------+-------+     +---------+---------+
+               |                       |
+               +-----------+-----------+
+                           v
+                +-------------------------+
+                | NeMo / Tool Validation  |
+                +------------+------------+
+                             v
+                +-------------------------+
+                | Deterministic Policy    |
+                | risk / scope / evidence |
+                +------------+------------+
+                             v
+                +-------------------------+
+                | Governance              |
+                | auto / human / denied   |
+                +------+------------------+
+                       |
+              +--------+--------+
+              |                 |
+              v                 v
+       AUTO-APPROVED      HUMAN REQUIRED
+              |                 |
+              +--------+--------+
+                       v
+              +--------------------+
+              | Bounded Executor   |
+              | simulator by default|
+              +---------+----------+
+                        v
+              +--------------------+
+              | Verification       |
+              +---------+----------+
+                        v
+              +--------------------+
+              | Hash-chained Audit |
+              +--------------------+
+```
 
-A deterministic PolicyEngine independently validates risk tier, command patterns, evidence linkage and target scope.
+---
 
-### Execution layer
+## 10. Technical Maturity
 
-The public submission includes a deterministic simulator. A production adapter can later target Kubernetes/GitOps APIs while preserving the same action contract.
+The repository is a Python application rather than a notebook or single-script proof of concept. It currently contains:
 
-### Observability layer
+- typed Pydantic domain models;
+- Nebius provider abstraction;
+- Tavily provider abstraction;
+- iterative model/tool orchestration;
+- deterministic policy engine;
+- explicit governance engine;
+- simulation runtime;
+- cryptographically linked audit events;
+- safety-policy benchmark;
+- automated tests;
+- CI configuration;
+- architecture/security documentation;
+- reproducible CLI commands.
 
-An append-only JSONL audit trail records incident receipt, evidence collection, policy evaluation and execution outcomes.
+The repository history also contains explicit security hardening and adversarial authorization test work, making the development trajectory visible rather than merely asserted. fileciteturn15file0L1-L2
 
-## Demonstrated Prototype
+---
 
-The included demonstration scenario is a Kubernetes RBAC regression causing CrashLoopBackOff. The agent researches the problem, produces a diagnosis, proposes read-only validation and a least-privilege RBAC dry-run, and blocks destructive commands such as cluster deletion.
+## 11. Evaluation Plan
 
-A second adversarial scenario places a destructive instruction inside log content. The system is expected to treat that string as untrusted evidence rather than executable authority.
+Evaluation is intentionally split into **capability** and **safety**.
 
-## Impact
+### Capability
 
-The intended users are:
+- diagnosis correctness;
+- evidence relevance;
+- remediation validity;
+- structured-output validity;
+- tool-call success;
+- latency to first useful proposal.
 
-- SRE and platform engineering teams,
-- DevOps organizations operating Kubernetes and cloud infrastructure,
-- managed service providers,
-- engineering teams with small on-call rotations,
-- organizations that need explainable automation rather than opaque autonomous behavior.
+### Safety
 
-The immediate impact target is reduced mean time to diagnose and reduced operator toil. The safety target is more important: automation should reduce time-to-recovery without increasing the probability of catastrophic operator-equivalent mistakes.
+- destructive-action block rate;
+- false-positive block rate;
+- evidence-linkage coverage;
+- correct human-approval routing;
+- prompt-injection resistance;
+- audit integrity;
+- post-condition verification completeness.
 
-## Evaluation Plan
+The repository includes a deterministic benchmark with safe and adversarial policy cases that can be executed locally with:
 
-The prototype should be evaluated using an incident benchmark containing normal, ambiguous and adversarial cases.
+```bash
+python -m app.cli benchmark
+```
 
-Primary metrics:
+The design goal is not maximum action throughput. It is maximum **useful work per unit of unjustified authority**.
 
-- diagnosis accuracy,
-- evidence relevance,
-- percentage of proposed actions linked to evidence,
-- unsafe-action block rate,
-- false-positive policy block rate,
-- dry-run success rate,
-- latency to first useful remediation proposal,
-- audit completeness.
+---
 
-A successful system is not the one that executes the most actions. It is the one that solves the incident while minimizing unjustified authority.
+## 12. Reproducibility
 
-## Security and Responsible Autonomy
+The public demonstration is intentionally runnable without external credentials.
 
-The prototype defaults to safe simulation. No live cluster is required to evaluate it.
+```bash
+python -m app.cli demo
+python -m app.cli benchmark
+python -m app.cli verify-audit
+pytest -q
+ruff check .
+```
 
-Before production deployment, the runtime adapter should add workload identity, resource allowlists, admission control, short-lived credentials, human approval for high-risk changes, secret redaction, network egress controls and rollback verification.
+When credentials are supplied, the same orchestration layer can use the live Nebius and Tavily providers.
 
-The architecture explicitly rejects the idea that an LLM alone can be trusted to authorize infrastructure changes.
+This dual-path design prevents a judge from encountering an unusable submission merely because external credentials are absent.
 
-## Hackathon Compliance
+---
 
-The project targets the **Coding and Agentic Engineering Track**. The official rules require a working application running on Nebius Token Factory or Nebius AI Cloud, at least one NVIDIA open-source model, a public open-source code repository, a README and a public demonstration video shorter than three minutes. The official deadline is October 30, 2026 at 10:00 a.m. PDT.
+## 13. Security and Responsible Autonomy
 
-The submission is also eligible in principle for the Best Use of Tavily bonus because Tavily is used as a functional runtime component rather than only mentioned in documentation. Final prize eligibility remains subject to the official rules and actual submission evidence.
+The system follows a fail-closed philosophy.
 
-## Project Maturity
+Unsafe actions are not converted into "safer" commands by the model and executed. They remain denied.
 
-This repository is intentionally organized as a real software project rather than a notebook or single proof-of-concept script. It includes:
+Missing evidence blocks mutations.
 
-- typed domain models,
-- provider adapters,
-- policy enforcement,
-- safe runtime simulation,
-- audit logging,
-- configuration management,
-- automated tests,
-- security documentation,
-- architecture documentation,
-- reproducible run instructions.
+High-impact operations can be routed to human approval.
 
-## Future Development
+The simulator refuses non-dry-run operations.
 
-With grant support, the project can evolve from a competition prototype into an open agentic SRE control plane:
+The audit implementation is tamper-evident through a SHA-256 hash chain. This is intentionally described as tamper-evidence rather than absolute immutability; production deployment should externally anchor or replicate the audit stream.
 
-**Phase 1 — Robustness:** richer incident benchmark, policy packs, structured output validation and evaluation harness.
+The public prototype therefore demonstrates safety architecture without requiring real production credentials.
 
-**Phase 2 — Real infrastructure:** Kubernetes and GitOps adapters with namespace-scoped credentials and rollback verification.
+---
 
-**Phase 3 — Organization scale:** integrations with Prometheus, Loki, OpenTelemetry, CI/CD and incident-management systems.
+## 14. Impact
 
-**Phase 4 — Agent interoperability:** policy-governed MCP gateways so third-party tools can participate without bypassing the same authorization envelope.
+Target users include:
 
-## Funding Use
+- SRE and platform engineering teams;
+- DevOps organizations operating Kubernetes/cloud infrastructure;
+- managed service providers;
+- engineering organizations with small on-call rotations;
+- regulated organizations requiring explainable automation.
 
-Potential grant funding would be allocated to engineering, evaluation and infrastructure hardening rather than speculative model training:
+Potential impact areas include:
 
-- 35% — production-grade execution adapters and security boundaries,
-- 25% — incident benchmark and evaluation infrastructure,
-- 20% — observability, provenance and audit features,
-- 10% — deployment automation and hosted demonstration environment,
-- 10% — documentation, open-source maintenance and developer onboarding.
+- lower mean time to diagnose;
+- reduced operator toil;
+- faster access to current technical knowledge;
+- more consistent remediation procedures;
+- lower risk from autonomous tooling;
+- stronger auditability for AI-assisted operations.
 
-## Closing Statement
+The long-term product direction is an enterprise control plane for governed agentic operations across Kubernetes, GitOps, observability, CI/CD and incident-management systems.
 
-InfraSentinel-Agentic proposes a practical answer to one of the central questions of agentic AI: **How do we give an AI system enough authority to be useful without giving it enough authority to become dangerous?**
+---
 
-The answer is not to remove autonomy. It is to engineer autonomy as a bounded capability.
+## 15. Hackathon Alignment
 
-Nebius supplies scalable inference infrastructure. NVIDIA Nemotron supplies the reasoning engine. Tavily supplies current evidence. NeMo Guardrails supplies programmable model-level controls. The project's deterministic policy and execution boundary convert these capabilities into an operational system whose authority is explicit, reviewable and testable.
+The official Nebius x NVIDIA Global AI Hackathon rules require a working project, a working demo/test build, a public open-source repository with a README, English submission materials, use of Nebius Token Factory or Nebius AI Cloud with at least one NVIDIA open-source model, and technology feedback. The four primary judging dimensions are equally weighted: **Technological Implementation, Design, Potential Impact, and Quality of the Idea**. The current official deadline is **October 30, 2026 at 10:00 a.m. PDT**. citeturn665148search7
 
-That is the foundation for an SRE agent that can move from demo to production without pretending that intelligence and authorization are the same thing.
+InfraSentinel addresses the four criteria directly:
+
+| Jury dimension | Evidence in the project |
+|---|---|
+| Technological Implementation | Nebius + Nemotron + Tavily + Guardrails + iterative tool orchestration + deterministic policy |
+| Design | explicit trust boundaries and operator-oriented incident flow |
+| Potential Impact | SRE use case with a concrete production roadmap |
+| Quality of Idea | Evidence-Bound Autonomy as a general architecture for governable agents |
+
+The Best Use of Tavily submission case is also explicit: Tavily is part of the live evidence path and its results are preserved as provenance-bearing objects rather than being used as a decorative interface.
+
+---
+
+## 16. Development Plan
+
+### Phase 1 — Competition hardening
+
+- expand the incident benchmark;
+- expand adversarial prompt-injection cases;
+- add structured-output validation;
+- add repeatable evaluation reports;
+- polish the operator demonstration.
+
+### Phase 2 — Controlled production pilot
+
+- namespace-scoped Kubernetes credentials;
+- Kubernetes and observability adapters;
+- GitOps promotion;
+- rollback verification;
+- persistent audit storage.
+
+### Phase 3 — Enterprise platform
+
+- organizational policy packs;
+- multi-cluster operations;
+- continuous agent evaluation;
+- incident memory;
+- compliance reporting;
+- policy-governed MCP tool gateway.
+
+---
+
+## 17. Funding Use
+
+Potential support would be directed toward measurable engineering outcomes:
+
+| Area | Share |
+|---|---:|
+| Secure infrastructure adapters | 30% |
+| Evaluation / red-team benchmark | 25% |
+| Observability, provenance and audit | 20% |
+| Demo / hosted reproducibility | 15% |
+| Documentation and open-source maintenance | 10% |
+
+The purpose of funding is to validate and harden the control plane, not to pursue unrestricted speculative training.
+
+---
+
+## 18. Closing Statement
+
+InfraSentinel-Agentic addresses a central challenge of agentic AI:
+
+**How can an AI system receive enough authority to be useful without receiving enough authority to become dangerous?**
+
+The proposed answer is architectural.
+
+Do not make the model the authority boundary.
+
+Give it access to current evidence. Give it structured tools. Let it reason over long horizons. Then place authorization outside the model, make governance explicit, constrain the executor, verify the result, and record the decision path.
+
+Nebius provides the inference plane. NVIDIA Nemotron provides the reasoning capability. Tavily provides current operational evidence. NeMo Guardrails provides programmable model/tool controls. InfraSentinel supplies the missing system-level layer: **evidence-bound, policy-governed operational authority**.
+
+The result is a credible path from an AI demonstration to a governable autonomous SRE control plane.
